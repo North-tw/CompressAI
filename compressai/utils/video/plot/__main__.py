@@ -37,6 +37,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 
 _backends = ["matplotlib", "plotly"]
@@ -79,7 +80,7 @@ def parse_json_file(filepath, metric):
 
 
 def matplotlib_plt(
-    scatters, title, ylabel, output_file, limits=None, show=False, figsize=None
+    scatters, title, ylabel, output_file, limits=None, show=False, figsize=None, bpp=False
 ):
     linestyle = "-"
     hybrid_matches = ["x26", "VTM", "HM", "WebP", "AV1"]
@@ -89,21 +90,39 @@ def matplotlib_plt(
     for sc in scatters:
         if any(x in sc["name"] for x in hybrid_matches):
             linestyle = "--"
-        ax.plot(
-            sc["xs"],
-            sc["ys"],
-            marker=".",
-            linestyle=linestyle,
-            linewidth=0.7,
-            label=sc["name"],
-        )
+        if bpp:
+            ax.plot(
+                list(map(lambda x: x*1000/1920/1080/120, sc["xs"])),
+                sc["ys"],
+                marker=".",
+                linestyle=linestyle,
+                linewidth=0.7,
+                label=sc["name"],
+            )
+        else:
+            ax.plot(
+                sc["xs"],
+                sc["ys"],
+                marker=".",
+                linestyle=linestyle,
+                linewidth=0.7,
+                label=sc["name"],
+            )
 
-    ax.set_xlabel("Bit-rate [kbps]")
+    if bpp:
+        ax.set_xlabel("BPP")
+    else:
+        ax.set_xlabel("Bit-rate [kbps]")
+    
     ax.set_ylabel(ylabel)
     ax.grid()
     if limits is not None:
         ax.axis(limits)
     ax.legend(loc="lower right")
+    if bpp:
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    # else:
+    #     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
     if title:
         ax.title.set_text(title)
@@ -116,7 +135,7 @@ def matplotlib_plt(
 
 
 def plotly_plt(
-    scatters, title, ylabel, output_file, limits=None, show=False, figsize=None
+    scatters, title, ylabel, output_file, limits=None, show=False, figsize=None, bpp=False
 ):
     del figsize
     try:
@@ -129,9 +148,15 @@ def plotly_plt(
 
     fig = go.Figure()
     for sc in scatters:
-        fig.add_traces(go.Scatter(x=sc["xs"], y=sc["ys"], name=sc["name"]))
+        if bpp:
+            fig.add_traces(go.Scatter(x=list(map(lambda x: x*1000/1920/1080/120, sc["xs"])), y=sc["ys"], name=sc["name"]))
+        else:
+            fig.add_traces(go.Scatter(x=sc["xs"], y=sc["ys"], name=sc["name"]))
 
-    fig.update_xaxes(title_text="Bit-rate [kbps]")
+    if bpp:
+        fig.update_xaxes(title_text="Bit-rate [kbps]")
+    else:
+        fig.update_xaxes(title_text="BPP")
     fig.update_yaxes(title_text=ylabel)
     if limits is not None:
         fig.update_xaxes(range=[limits[0], limits[1]])
@@ -159,6 +184,10 @@ def setup_args():
         type=str,
         default="psnr-rgb",
         help="Metric ,default: %(default)s)",
+    )
+    parser.add_argument(
+        "--bpp",
+        action="store_true",
     )
     parser.add_argument("-t", "--title", metavar="", type=str, help="Plot title")
     parser.add_argument("-o", "--output", metavar="", type=str, help="Output file name")
@@ -215,6 +244,7 @@ def main(argv):
         limits=args.axes,
         figsize=args.figsize,
         show=args.show,
+        bpp=args.bpp,
     )
 
 
